@@ -1,7 +1,9 @@
+#include <iostream>
 #include "ffmpeg_encode_frame.h"
+
 FFmpegEncodeFrame::FFmpegEncodeFrame()
 {
-    mem_cp_func_map_.push_back(std::make_pair(AV_PIX_FMT_YUV420P, std::bind(&FFmpegEncodeFrame::CopyYuvFrameData, this, std::placeholders::_1, std::placeholders::_2)));
+    mem_cp_func_map_.insert(std::make_pair(AV_PIX_FMT_YUV420P, std::bind(&FFmpegEncodeFrame::CopyYuvFrameData, this, std::placeholders::_1, std::placeholders::_2)));
 }
 
 FFmpegEncodeFrame::~FFmpegEncodeFrame()
@@ -44,16 +46,18 @@ bool FFmpegEncodeFrame::Initsize(const VideoParams &params)
     ctx_->time_base = params.time_base;
     ctx_->framerate = params.framerate;
     ctx_->gop_size = params.gop_size;
-    ctx_->pix_fmt = params.pix_fmt;
+    ctx_->pix_fmt = AVPixelFormat(params.pix_fmt);
 
     frame_->format = ctx_->pix_fmt;
     frame_->width = ctx_->width;
     frame_->height = ctx_->height;
     
     int ret = avcodec_open2(ctx_, codec_, nullptr);
+    char errbuf[512]{0};
     if(ret < 0)
     {
-        std::cout << "Could not open codec " << av_err2str(ret) std::endl;
+        av_make_error_string(errbuf, sizeof(errbuf), ret);
+        std::cout << "Could not open codec " << errbuf << std::endl;
         return false;
     }
 
@@ -71,7 +75,7 @@ bool FFmpegEncodeFrame::Initsize(const VideoParams &params)
         return false;
     }
 
-    auto iter = mem_cp_func_map_.find(ctx->pix_fmt);
+    auto iter = mem_cp_func_map_.find(AVPixelFormat(ctx_->pix_fmt));
     if(iter == mem_cp_func_map_.end())
     {
         std::cout << "Could suport pixformat" << std::endl;

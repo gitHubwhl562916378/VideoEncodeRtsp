@@ -4,6 +4,7 @@ extern "C"
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
 }
+#include <functional>
 #include <map>
 
 //https://ffmpeg.org/doxygen/trunk/encode_video_8c-example.html
@@ -32,7 +33,7 @@ public:
         int pix_fmt = AV_PIX_FMT_YUV420P;
     };
     explicit FFmpegEncodeFrame();
-    
+
     ~FFmpegEncodeFrame();
 
     bool Initsize(const VideoParams &params);
@@ -46,6 +47,6 @@ private:
     AVCodecContext *ctx_ = nullptr;
     AVFrame *frame_ = nullptr;
     AVPacket *pkt_ = nullptr;
-    std::map<int, std::function<void(void*, AVFrame*)>> mem_cp_func_map_;
+    std::map<AVPixelFormat, std::function<void(void*, AVFrame*)>> mem_cp_func_map_;
     std::function<void(void*, AVFrame*)> mem_cp_func_;
 };
