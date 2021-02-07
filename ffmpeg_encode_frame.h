@@ -4,6 +4,7 @@ extern "C"
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
 }
+#include <map>
 
 //https://ffmpeg.org/doxygen/trunk/encode_video_8c-example.html
 class FFmpegEncodeFrame
@@ -11,6 +12,7 @@ class FFmpegEncodeFrame
 public:
     struct VideoParams
     {
+        std::string codec_name;
         /* put sample parameters */
         int bit_rate = 400000;
         /* resolution must be a multiple of two */
@@ -29,11 +31,21 @@ public:
         int max_b_frames = 1;
         int pix_fmt = AV_PIX_FMT_YUV420P;
     };
-    explicit FFmpegEncodeFrame(const VideoParams &params);
+    explicit FFmpegEncodeFrame();
+    
+    ~FFmpegEncodeFrame();
 
-    bool Encode(void *data, int size, int type);
+    bool Initsize(const VideoParams &params);
+
+    bool Encode(void *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
+    void CopyYuvFrameData(void *src, AVFrame *frame);
+
     const AVCodec *codec_ = nullptr;
     AVCodecContext *ctx_ = nullptr;
+    AVFrame *frame_ = nullptr;
+    AVPacket *pkt_ = nullptr;
+    std::map<int, std::function<void(void*, AVFrame*)>> mem_cp_func_map_;
+    std::function<void(void*, AVFrame*)> mem_cp_func_;
 };
