@@ -93,7 +93,7 @@ bool FFmpegEncodeFrame::Initsize(const VideoParams &params)
     return true;
 }
 
-bool FFmpegEncodeFrame::Encode(void *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back)
+bool FFmpegEncodeFrame::Encode(char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back)
 {
     int ret;
     ret = av_frame_make_writable(frame_);
@@ -134,7 +134,7 @@ bool FFmpegEncodeFrame::Encode(void *data, int size, int type, int64_t pts, std:
     }
 }
 
-void FFmpegEncodeFrame::CopyYuvFrameData(void *src, AVFrame *frame)
+void FFmpegEncodeFrame::CopyYuvFrameData(char *src, AVFrame *frame)
 {
     for(int y = 0; y < frame->height; y++)
     {

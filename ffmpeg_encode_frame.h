@@ -1,3 +1,11 @@
+/*
+ * @Author: your name
+ * @Date: 2021-02-09 19:05:24
+ * @LastEditTime: 2021-02-09 19:36:38
+ * @LastEditors: Please set LastEditors
+ * @Description: In User Settings Edit
+ * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_encode_frame.h
+ */
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -38,15 +46,16 @@ public:
 
     bool Initsize(const VideoParams &params);
 
-    bool Encode(void *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
+    bool Encode(char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
-    void CopyYuvFrameData(void *src, AVFrame *frame);
+    using Mem_Option_Func = std::function<void(char*, AVFrame*)>;
+    void CopyYuvFrameData(char *src, AVFrame *frame);
 
     const AVCodec *codec_ = nullptr;
     AVCodecContext *ctx_ = nullptr;
     AVFrame *frame_ = nullptr;
     AVPacket *pkt_ = nullptr;
-    std::map<AVPixelFormat, std::function<void(void*, AVFrame*)>> mem_cp_func_map_;
-    std::function<void(void*, AVFrame*)> mem_cp_func_;
+    std::map<AVPixelFormat, Mem_Option_Func> mem_cp_func_map_;
+    Mem_Option_Func mem_cp_func_;
 };
