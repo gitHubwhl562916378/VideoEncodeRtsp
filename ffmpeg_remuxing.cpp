@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:48:52
- * @LastEditTime: 2021-02-09 23:26:52
+ * @LastEditTime: 2021-02-17 20:47:36
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_remuxing.cpp
@@ -38,7 +38,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
     if(ret !=0 )
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
-        std::cout << __FUNCTIONW__ << " " << errbuf << std::endl;
+        std::cout << __FUNCTION__ << " " << errbuf << std::endl;
         avformat_close_input(&format_ctx);
         avformat_free_context(format_ctx);
         return false;
@@ -48,7 +48,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
-        std::cout << __FUNCTIONW__ << " " << errbuf << std::endl;
+        std::cout << __FUNCTION__ << " " << errbuf << std::endl;
         avformat_close_input(&format_ctx);
         avformat_free_context(format_ctx);
         return false;
@@ -59,7 +59,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
-        std::cout << __FUNCTIONW__ << " " << errbuf << std::endl;
+        std::cout << __FUNCTION__ << " " << errbuf << std::endl;
         avformat_close_input(&format_ctx);
         avformat_free_context(format_ctx);
         avformat_free_context(output_format);
@@ -83,7 +83,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
         if(ret != 0)
         {
             av_make_error_string(errbuf, sizeof(errbuf), ret);
-            std::cout << __FUNCTIONW__ << " " << errbuf << std::endl;
+            std::cout << __FUNCTION__ << " " << errbuf << std::endl;
             avformat_close_input(&format_ctx);
             avformat_free_context(format_ctx);
             avformat_free_context(output_format);
@@ -99,7 +99,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
         if (ret != 0)
         {
             av_make_error_string(errbuf, sizeof(errbuf), ret);
-            std::cout << __FUNCTIONW__ << " " << errbuf << std::endl;
+            std::cout << __FUNCTION__ << " " << errbuf << std::endl;
             avformat_close_input(&format_ctx);
             avformat_free_context(format_ctx);
             avformat_free_context(output_format);
@@ -133,7 +133,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
         if(in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             AVRational time_base = in_stream->time_base;
-            AVRational time_base_q = AV_TIME_BASE_Q;
+            AVRational time_base_q{1, AV_TIME_BASE};
             int64_t pts_time = av_rescale_q(packet.dts, time_base, time_base_q);
             int64_t now_time = av_gettime() - start_time;
             if(pts_time > now_time)
@@ -164,7 +164,7 @@ bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string 
 
 bool FFmpegRemuxing::RemuxingImage(const FFmpegEncodeFrame::VideoParams &params, const std::string &output, const std::string &oformat)
 {
-
+    return true;
 }
 
 void FFmpegRemuxing::Stop()
