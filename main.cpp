@@ -6,9 +6,12 @@
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\main.cpp
  */
+#include "ffmpeg_remuxing.h"
 
 int main()
 {
-    
+    FFmpegRemuxing remuxing;
+    remuxing.RemuxingStream("person.mp4", "rtsp://192.168.2.66/test", "rtsp");
+
     return 0;
 }
