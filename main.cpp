@@ -11,7 +11,7 @@
 int main()
 {
     FFmpegRemuxing remuxing;
-    remuxing.RemuxingVideoFile("person.mp4", "rtsp://192.168.2.66/test", "rtsp");
+    remuxing.RemuxingVideoFile("rtsp://192.168.2.66/whl_desktop", "rtsp://192.168.2.66/test", "rtsp");
 
     return 0;
 }
