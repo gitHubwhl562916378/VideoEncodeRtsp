@@ -15,8 +15,6 @@ extern "C"
 
 FFmpegRemuxing::FFmpegRemuxing()
 {
-    av_register_all();
-    avformat_network_init();
     av_log_set_level(AV_LOG_INFO);
 
     running_.store(true);
@@ -29,12 +27,6 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
     AVDictionary *opt = nullptr;
     char errbuf[512]{0};
 	
-    // av_dict_set(&opt,"buffer_size","1024000",0);
-    // av_dict_set(&opt,"max_delay","0",0);
-    // av_dict_set(&opt, "rtbufsize", "1024000", 0);
-    // av_dict_set(&opt, "muxdelay", "0.1", 0);
-    // av_dict_set(&opt, "preset", "ultrafast", 0);
-    // av_dict_set(&opt, "tune", "zerolatency", 0);
     av_dict_set(&opt, "rtsp_transport", "tcp", 0);
     av_dict_set(&opt, "stimeout", "10000000", 0);
 
@@ -73,6 +65,11 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
     for(int i = 0; i < format_ctx->nb_streams; i++)
     {
         AVStream *in_stream = format_ctx->streams[i];
+        if(in_stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
+        {
+            continue;
+        }
+
         AVStream *out_stream = avformat_new_stream(output_format, nullptr);
         if(!out_stream)
         {
@@ -112,18 +109,28 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
         }
     }
 
+    // av_dict_set(&opt,"buffer_size","425984",0);
+    // av_dict_set(&opt,"max_delay","0",0);
+    // av_dict_set(&opt, "rtbufsize", "1024000", 0);
+    // av_dict_set(&opt, "muxdelay", "0.1", 0);
+    // av_dict_set(&opt, "preset", "ultrafast", 0);
+    // av_dict_set(&opt, "tune", "zerolatency", 0);
+    av_dict_set(&opt, "rtsp_transport", "tcp", 0);
     ret = avformat_write_header(output_format, &opt);
     if(ret != 0)
     {
-        avformat_free_context(format_ctx);
+        av_make_error_string(errbuf, sizeof(errbuf), ret);
+        std::cout << __FUNCTION__ << " " << errbuf << std::endl;
         avformat_close_input(&format_ctx);
+        avformat_free_context(format_ctx);
         avformat_free_context(output_format);
+        return false;
     }
 
     int64_t start_time = av_gettime();
     AVPacket packet;
     running_.store(true);
-    int frame_index = 0;
+    int duration = 0;
     while (running_.load())
     {
         AVStream *in_stream, *out_stream;
@@ -132,18 +139,14 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
         {
             break;
         }
-    
+        
+        if(packet.pts < 0 || packet.dts < 0)
+        {
+            continue;
+        }
+
         in_stream  = format_ctx->streams[packet.stream_index];
         out_stream = output_format->streams[packet.stream_index];
-
-        if(packet.pts == AV_NOPTS_VALUE)
-        {
-            AVRational time_base1 = format_ctx->streams[packet.stream_index]->time_base;
-            int64_t calc_duration = (double)AV_TIME_BASE / av_q2d(format_ctx->streams[packet.stream_index]->r_frame_rate);
-            packet.pts = (double)(frame_index * calc_duration) / (double)(av_q2d(time_base1)*AV_TIME_BASE);
-            packet.dts = packet.pts;
-            packet.duration = (double)calc_duration / (double)(av_q2d(time_base1) * AV_TIME_BASE);
-        }
 
         if(in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
@@ -158,12 +161,11 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
         packet.pts = av_rescale_q_rnd(packet.pts, in_stream->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         packet.dts = av_rescale_q_rnd(packet.dts, in_stream->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         packet.duration = av_rescale_q(packet.duration, in_stream->time_base, out_stream->time_base);
-        frame_index++;
 
-        ret = av_write_frame(output_format, &packet);
+        ret = av_interleaved_write_frame(output_format, &packet);
         if (ret < 0) {
             av_make_error_string(errbuf, sizeof(errbuf), ret);
-            std::cout << "Error muxing packet: " << errbuf << std::endl;
+            std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
             break;
         }
 
@@ -182,24 +184,7 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
 
     running_.store(false);
 }
-        // std::string codec_name;
-        // /* put sample parameters */
-        // int bit_rate = 400000;
-        // /* resolution must be a multiple of two */
-        // int width = 352;
-        // int height = 288;
-        // /* frames per second */
-        // AVRational time_base{1,25};
-        // AVRational framerate{25,1};
-        // /* emit one intra frame every ten frames
-        // * check frame pict_type before passing frame
-        // * to encoder, if frame->pict_type is AV_PICTURE_TYPE_I 
-        // * then gop_size is ignored and the output of encoder
-        // * will always be I frame irrespective to gop_size
-        // */
-        // int gop_size = 10;
-        // int max_b_frames = 1;
-        // int pix_fmt = AV_PIX_FMT_YUV420P;
+
 bool FFmpegRemuxing::RemuxingImage(const FFmpegEncodeFrame::VideoParams &params, const std::string &output, const std::string &oformat)
 {
     AVFormatContext *output_format;
