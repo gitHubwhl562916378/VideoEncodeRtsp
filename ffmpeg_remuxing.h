@@ -23,7 +23,7 @@ class FFmpegRemuxing
 public:
     explicit FFmpegRemuxing();
 
-    bool RemuxingStream(const std::string &input, const std::string &output, const std::string &oformat);
+    bool RemuxingVideoFile(const std::string &input, const std::string &output, const std::string &oformat);
 
     bool RemuxingImage(const FFmpegEncodeFrame::VideoParams &params, const std::string &output, const std::string &oformat);
 

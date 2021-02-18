@@ -22,7 +22,7 @@ FFmpegRemuxing::FFmpegRemuxing()
     running_.store(true);
 }
 
-bool FFmpegRemuxing::RemuxingStream(const std::string &input, const std::string &output, const std::string &oformat)
+bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::string &output, const std::string &oformat)
 {
     AVFormatContext *format_ctx = nullptr;
     AVFormatContext *output_format = nullptr;
