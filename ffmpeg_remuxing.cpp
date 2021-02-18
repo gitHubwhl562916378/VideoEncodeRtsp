@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:48:52
- * @LastEditTime: 2021-02-09 23:26:52
+ * @LastEditTime: 2021-02-18 22:14:52
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_remuxing.cpp
@@ -12,6 +12,7 @@ extern "C"
     #include <libavutil/time.h>
 }
 #include "ffmpeg_remuxing.h"
+#include "ffmpeg_encode_frame.h"
 
 FFmpegRemuxing::FFmpegRemuxing()
 {
@@ -130,7 +131,6 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
     int64_t start_time = av_gettime();
     AVPacket packet;
     running_.store(true);
-    int duration = 0;
     while (running_.load())
     {
         AVStream *in_stream, *out_stream;
@@ -151,7 +151,7 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
         if(in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             AVRational time_base = in_stream->time_base;
-            AVRational time_base_q = AV_TIME_BASE_Q;
+            AVRational time_base_q{1, AV_TIME_BASE};
             int64_t pts_time = av_rescale_q(packet.dts, time_base, time_base_q);
             int64_t now_time = av_gettime() - start_time;
             if(pts_time > now_time)
@@ -185,9 +185,11 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
     running_.store(false);
 }
 
-bool FFmpegRemuxing::RemuxingImage(const FFmpegEncodeFrame::VideoParams &params, const std::string &output, const std::string &oformat)
+bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
 {
-    AVFormatContext *output_format;
+    AVFormatContext *output_format = nullptr;
+    AVOutputFormat *fmt = nullptr;
+    AVStream *video_st = nullptr;
     char errbuf[512]{0};
     int ret = avformat_alloc_output_context2(&output_format, nullptr, oformat.data(), output.data());
     if(ret != 0)
@@ -198,8 +200,84 @@ bool FFmpegRemuxing::RemuxingImage(const FFmpegEncodeFrame::VideoParams &params,
         return false;
     }
 
-    // output_format->codec_name = 
+    if(!(output_format->oformat->flags & AVFMT_NOFILE))
+    {
+        ret = avio_open(&output_format->pb, output.data(), AVIO_FLAG_WRITE);
+        if (ret != 0)
+        {
+            av_make_error_string(errbuf, sizeof(errbuf), ret);
+            std::cout << __FUNCTION__ << " " << errbuf << std::endl;
+            avformat_free_context(output_format);
+            return false;
+        }
+    }
+
+    video_st = avformat_new_stream(output_format, 0);
+    if(!video_st)
+    {
+        avformat_free_context(output_format);
+        return false;
+    }
+    video_st->time_base = params.time_base;
+    
+    FFmpegEncodeFrame encoder;
+    encoder.Initsize(params);
+
+    AVDictionary *opt = nullptr;
+    // av_dict_set(&opt,"buffer_size","425984",0);
+    // av_dict_set(&opt,"max_delay","0",0);
+    // av_dict_set(&opt, "rtbufsize", "1024000", 0);
+    // av_dict_set(&opt, "muxdelay", "0.1", 0);
+    // av_dict_set(&opt, "preset", "ultrafast", 0);
+    // av_dict_set(&opt, "tune", "zerolatency", 0);
+    av_dict_set(&opt, "rtsp_transport", "tcp", 0);
+    ret = avformat_write_header(output_format, &opt);
+    if(ret != 0)
+    {
+        av_make_error_string(errbuf, sizeof(errbuf), ret);
+        std::cout << __FUNCTION__ << " " << errbuf << std::endl;
+        avformat_free_context(output_format);
+        return false;
+    }
+    
+    frame_size_ = av_image_get_buffer_size(params.pix_fmt, params.width, params.height, 1);
+    frame_buffer_ = new char[frame_size_];
+
+    int64_t start_time = av_gettime();
+    AVPacket packet;
+    running_.store(true);
+    while (running_.load())
+    {
+        AVRational time_base = params.time_base;
+        AVRational time_base_q{1, AV_TIME_BASE};
+        int64_t pts_time = av_rescale_q(packet.dts, time_base, time_base_q);
+        int64_t now_time = av_gettime() - start_time;
+        if(pts_time > now_time)
+            av_usleep(pts_time - now_time);
+        
+        std::lock_guard<std::mutex> lock(frame_mtx_);
+        encoder.Encode(frame_buffer_, frame_size_, pix_fmt_, now_time, [&](AVPacket *packet){
+            ret = av_interleaved_write_frame(output_format, packet);
+            if (ret < 0) {
+                av_make_error_string(errbuf, sizeof(errbuf), ret);
+                std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
+                return;
+            }
+        });
+    }
+    
+    running_.store(false);
+    delete frame_buffer_;
+    
     return true;
+}
+
+void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
+{
+    std::lock_guard<std::mutex> lock(frame_mtx_);
+    ::memcpy(frame_buffer_, src, size);
+    frame_size_ = size;
+    pix_fmt_ = fmt;
 }
 
 void FFmpegRemuxing::Stop()

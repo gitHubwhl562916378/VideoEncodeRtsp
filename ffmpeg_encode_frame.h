@@ -1,11 +1,12 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:05:24
- * @LastEditTime: 2021-02-09 19:36:38
+ * @LastEditTime: 2021-02-18 21:53:11
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_encode_frame.h
  */
+#pragma once
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -21,12 +22,12 @@ class FFmpegEncodeFrame
 public:
     struct VideoParams
     {
-        std::string codec_name;
+        std::string codec_name = "h264";
         /* put sample parameters */
         int bit_rate = 400000;
         /* resolution must be a multiple of two */
-        int width = 352;
-        int height = 288;
+        int width = 320;
+        int height = 640;
         /* frames per second */
         AVRational time_base{1,25};
         AVRational framerate{25,1};
@@ -38,7 +39,7 @@ public:
         */
         int gop_size = 10;
         int max_b_frames = 1;
-        int pix_fmt = AV_PIX_FMT_YUV420P;
+        AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P;
     };
     explicit FFmpegEncodeFrame();
 

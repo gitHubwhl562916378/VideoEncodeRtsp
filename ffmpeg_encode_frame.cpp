@@ -26,6 +26,7 @@ FFmpegEncodeFrame::~FFmpegEncodeFrame()
 
 bool FFmpegEncodeFrame::Initsize(const VideoParams &params)
 {
+    // codec_ = avcodec_find_encoder(code_id);  AV_CODEC_ID_H264
     codec_ = avcodec_find_encoder_by_name(params.codec_name.data());
     if(!codec_)
     {
