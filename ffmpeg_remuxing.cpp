@@ -12,7 +12,6 @@ extern "C"
     #include <libavutil/time.h>
 }
 #include "ffmpeg_remuxing.h"
-#include "ffmpeg_encode_frame.h"
 
 FFmpegRemuxing::FFmpegRemuxing()
 {
@@ -187,41 +186,49 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
 
 bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
 {
-    AVFormatContext *output_format = nullptr;
-    AVOutputFormat *fmt = nullptr;
-    AVStream *video_st = nullptr;
     char errbuf[512]{0};
-    int ret = avformat_alloc_output_context2(&output_format, nullptr, oformat.data(), output.data());
+    int ret = avformat_alloc_output_context2(&output_format_, nullptr, oformat.data(), output.data());
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
         std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-        avformat_free_context(output_format);
+        avformat_free_context(output_format_);
         return false;
     }
 
-    if(!(output_format->oformat->flags & AVFMT_NOFILE))
+    video_st_ = avformat_new_stream(output_format_, 0);
+    if(!video_st_)
     {
-        ret = avio_open(&output_format->pb, output.data(), AVIO_FLAG_WRITE);
+        avformat_free_context(output_format_);
+        return false;
+    }
+    video_st_->time_base = params.time_base;
+    
+    encoder_.reset(new FFmpegEncodeFrame);
+
+#if 1
+    auto pcodec_ctx = encoder_->Initsize(params);
+    if(!pcodec_ctx)
+    {
+        return false;
+    }
+    avcodec_parameters_from_context(video_st_->codecpar, pcodec_ctx);
+#else
+    bool is_ok = encoder_->Initsize(video_st_->codec, params);
+    avcodec_parameters_from_context(video_st_->codecpar, video_st_->codec);
+#endif
+
+    if(!(output_format_->oformat->flags & AVFMT_NOFILE))
+    {
+        ret = avio_open(&output_format_->pb, output.data(), AVIO_FLAG_WRITE);
         if (ret != 0)
         {
             av_make_error_string(errbuf, sizeof(errbuf), ret);
             std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-            avformat_free_context(output_format);
+            avformat_free_context(output_format_);
             return false;
         }
     }
-
-    video_st = avformat_new_stream(output_format, 0);
-    if(!video_st)
-    {
-        avformat_free_context(output_format);
-        return false;
-    }
-    video_st->time_base = params.time_base;
-    
-    FFmpegEncodeFrame encoder;
-    encoder.Initsize(params);
 
     AVDictionary *opt = nullptr;
     // av_dict_set(&opt,"buffer_size","425984",0);
@@ -231,53 +238,30 @@ bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
     // av_dict_set(&opt, "preset", "ultrafast", 0);
     // av_dict_set(&opt, "tune", "zerolatency", 0);
     av_dict_set(&opt, "rtsp_transport", "tcp", 0);
-    ret = avformat_write_header(output_format, &opt);
+    ret = avformat_write_header(output_format_, &opt);
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
         std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-        avformat_free_context(output_format);
+        avformat_free_context(output_format_);
         return false;
     }
-    
-    frame_size_ = av_image_get_buffer_size(params.pix_fmt, params.width, params.height, 1);
-    frame_buffer_ = new char[frame_size_];
 
-    int64_t start_time = av_gettime();
-    AVPacket packet;
-    running_.store(true);
-    while (running_.load())
-    {
-        AVRational time_base = params.time_base;
-        AVRational time_base_q{1, AV_TIME_BASE};
-        int64_t pts_time = av_rescale_q(packet.dts, time_base, time_base_q);
-        int64_t now_time = av_gettime() - start_time;
-        if(pts_time > now_time)
-            av_usleep(pts_time - now_time);
-        
-        std::lock_guard<std::mutex> lock(frame_mtx_);
-        encoder.Encode(frame_buffer_, frame_size_, pix_fmt_, now_time, [&](AVPacket *packet){
-            ret = av_interleaved_write_frame(output_format, packet);
-            if (ret < 0) {
-                av_make_error_string(errbuf, sizeof(errbuf), ret);
-                std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
-                return;
-            }
-        });
-    }
-    
-    running_.store(false);
-    delete frame_buffer_;
-    
     return true;
 }
 
 void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
 {
-    std::lock_guard<std::mutex> lock(frame_mtx_);
-    ::memcpy(frame_buffer_, src, size);
-    frame_size_ = size;
-    pix_fmt_ = fmt;
+    char errbuf[512]{0};
+    static int64_t start_pt = av_gettime();;
+    encoder_->Encode(src, size, fmt, av_gettime() - start_pt, [&](AVPacket *packet){
+        int ret = av_interleaved_write_frame(output_format_, packet);
+        if (ret < 0) {
+            av_make_error_string(errbuf, sizeof(errbuf), ret);
+            std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
+            return;
+        }
+    });
 }
 
 void FFmpegRemuxing::Stop()

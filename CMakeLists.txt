@@ -11,7 +11,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 #ADD_DEFINITIONS(-D_DEBUG_TEST) 
 
-# find_package(OpenCV REQUIRED)
+set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
+find_package(OpenCV REQUIRED)
 
 if (WIN32)
         set(FFMPEG_INCLUDE_DIRS D:/ffmpeg/x64/include)
@@ -40,4 +41,4 @@ file(GLOB SRCS *.cpp *.h)
 
 add_executable(${PROJECT_NAME} ${SRCS})
 target_link_libraries(${PROJECT_NAME} ${FFMPEG_LIBRARIES})
-# target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})

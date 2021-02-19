@@ -22,9 +22,9 @@ class FFmpegEncodeFrame
 public:
     struct VideoParams
     {
-        std::string codec_name = "h264";
+        std::string codec_name = "libx264";
         /* put sample parameters */
-        int bit_rate = 400000;
+        int bit_rate = 160000;
         /* resolution must be a multiple of two */
         int width = 320;
         int height = 640;
@@ -45,13 +45,15 @@ public:
 
     ~FFmpegEncodeFrame();
 
-    bool Initsize(const VideoParams &params);
+    AVCodecContext* Initsize(const VideoParams &params);
 
-    bool Encode(char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
+    bool Initsize(AVCodecContext* pcodec_ctx, const VideoParams &params);
+
+    bool Encode(const char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
-    using Mem_Option_Func = std::function<void(char*, AVFrame*)>;
-    void CopyYuvFrameData(char *src, AVFrame *frame);
+    using Mem_Option_Func = std::function<void(const char*, AVFrame*)>;
+    void CopyYuvFrameData(const char *src, AVFrame *frame);
 
     const AVCodec *codec_ = nullptr;
     AVCodecContext *ctx_ = nullptr;

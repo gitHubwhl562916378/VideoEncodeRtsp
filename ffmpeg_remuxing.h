@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <memory>
 extern "C"
 {
     #include <libavutil/timestamp.h>
@@ -35,8 +36,8 @@ public:
 
 private:
     std::atomic_bool running_;
-    std::mutex frame_mtx_;
-    char *frame_buffer_ = nullptr;
-    int64_t frame_size_ = 0;
-    AVPixelFormat pix_fmt_;
+    AVFormatContext *output_format_ = nullptr;
+    AVOutputFormat *fmt_ = nullptr;
+    AVStream *video_st_ = nullptr;
+    std::shared_ptr<FFmpegEncodeFrame> encoder_;
 };
