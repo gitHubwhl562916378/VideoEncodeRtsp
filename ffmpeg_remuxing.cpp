@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:48:52
- * @LastEditTime: 2021-02-18 22:14:52
+ * @LastEditTime: 2021-02-19 17:42:07
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_remuxing.cpp
@@ -232,11 +232,11 @@ bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
 
     AVDictionary *opt = nullptr;
     // av_dict_set(&opt,"buffer_size","425984",0);
-    // av_dict_set(&opt,"max_delay","0",0);
+    av_dict_set(&opt,"max_delay","0.1",0);
     // av_dict_set(&opt, "rtbufsize", "1024000", 0);
     // av_dict_set(&opt, "muxdelay", "0.1", 0);
-    // av_dict_set(&opt, "preset", "ultrafast", 0);
-    // av_dict_set(&opt, "tune", "zerolatency", 0);
+    av_dict_set(&opt, "preset", "fast", 0); //ultrafast fast
+    av_dict_set(&opt, "tune", "zerolatency", 0);
     av_dict_set(&opt, "rtsp_transport", "tcp", 0);
     ret = avformat_write_header(output_format_, &opt);
     if(ret != 0)

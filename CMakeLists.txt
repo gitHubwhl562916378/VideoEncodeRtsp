@@ -11,12 +11,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 #ADD_DEFINITIONS(-D_DEBUG_TEST) 
 
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
+set(OpenCV_DIR E:/opencv3.4.0-x64/x64/vc15/lib)
 find_package(OpenCV REQUIRED)
 
 if (WIN32)
-        set(FFMPEG_INCLUDE_DIRS D:/ffmpeg/x64/include)
-        link_directories(D:/ffmpeg/x64/lib)
+        set(FFMPEG_INCLUDE_DIRS E:/ffmpeg/x64/include)
+        link_directories(E:/ffmpeg/x64/lib)
         list(APPEND FFMPEG_LIBRARIES avcodec avdevice avfilter avformat avutil postproc swresample swscale)
 elseif (UNIX)
         find_package(PkgConfig REQUIRED)

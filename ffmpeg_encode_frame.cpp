@@ -68,15 +68,17 @@ AVCodecContext* FFmpegEncodeFrame::Initsize(const VideoParams &params)
     frame_->height = ctx_->height;
     if(codec_->id == AV_CODEC_ID_H264)
     {
-        av_opt_set(ctx_->priv_data, "preset", "slow", 0);
-        // av_opt_set(ctx_->priv_data,"buffer_size","425984",0);
-        // av_opt_set(ctx_->priv_data,"max_delay","0",0);
-        // av_opt_set(ctx_->priv_data, "rtbufsize", "1024000", 0);
-        // av_opt_set(ctx_->priv_data, "muxdelay", "0.1", 0);
-        // av_opt_set(ctx_->priv_data, "preset", "ultrafast", 0);
-        // av_opt_set(ctx_->priv_data, "tune", "zerolatency", 0);
+        av_opt_set(ctx_->priv_data, "preset", "fast", 0);
+        av_opt_set(ctx_->priv_data, "tune", "zerolatency", 0);
     }
     
+    AVDictionary *opt = nullptr;
+    // av_dict_set(&opt,"buffer_size","425984",0);
+    av_dict_set(&opt,"max_delay","0.1",0);
+    // av_dict_set(&opt, "rtbufsize", "1024000", 0);
+    // av_dict_set(&opt, "muxdelay", "0.1", 0);
+    av_dict_set(&opt, "preset", "fast", 0); //ultrafast fast slow
+    av_dict_set(&opt, "tune", "zerolatency", 0);
     int ret = avcodec_open2(ctx_, codec_, nullptr);
     char errbuf[512]{0};
     if(ret < 0)

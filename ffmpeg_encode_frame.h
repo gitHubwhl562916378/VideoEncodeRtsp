@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:05:24
- * @LastEditTime: 2021-02-18 21:53:11
+ * @LastEditTime: 2021-02-19 17:30:50
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_encode_frame.h
@@ -24,7 +24,7 @@ public:
     {
         std::string codec_name = "libx264";
         /* put sample parameters */
-        int bit_rate = 160000;
+        int bit_rate = 400000;
         /* resolution must be a multiple of two */
         int width = 320;
         int height = 640;
