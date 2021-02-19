@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:48:52
- * @LastEditTime: 2021-02-19 17:42:07
+ * @LastEditTime: 2021-02-19 19:42:49
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_remuxing.cpp
@@ -253,8 +253,13 @@ bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
 void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
 {
     char errbuf[512]{0};
-    static int64_t start_pt = av_gettime();;
-    encoder_->Encode(src, size, fmt, av_gettime() - start_pt, [&](AVPacket *packet){
+    if(!image_start_pt_)
+    {
+        image_start_pt_ = av_gettime();
+    }
+    int64_t now_time = av_gettime() - image_start_pt_;
+    int64_t pts = av_rescale_q(now_time, {1, AV_TIME_BASE}, {1, 1000});
+    encoder_->Encode(src, size, fmt, pts, [&](AVPacket *packet){
         int ret = av_interleaved_write_frame(output_format_, packet);
         if (ret < 0) {
             av_make_error_string(errbuf, sizeof(errbuf), ret);

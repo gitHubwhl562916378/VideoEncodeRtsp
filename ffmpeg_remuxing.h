@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:48:44
- * @LastEditTime: 2021-02-18 22:13:32
+ * @LastEditTime: 2021-02-19 19:40:56
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\ffmpeg_remuxing.h
@@ -40,4 +40,5 @@ private:
     AVOutputFormat *fmt_ = nullptr;
     AVStream *video_st_ = nullptr;
     std::shared_ptr<FFmpegEncodeFrame> encoder_;
+    int64_t image_start_pt_ = 0;
 };
