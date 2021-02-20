@@ -42,4 +42,7 @@ file(GLOB SRCS *.cpp *.h)
 add_executable(${PROJECT_NAME} ${SRCS})
 target_link_libraries(${PROJECT_NAME} ${FFMPEG_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+
+if (UNIX)
 target_link_libraries(${PROJECT_NAME} pthread)
+endif ()
