@@ -193,11 +193,6 @@ void FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
         return;
     }
 
-    if(encode_image_thread_.joinable())
-    {
-        encode_image_thread_.join();
-    }
-
     encode_image_thread_ = std::thread(std::bind(&FFmpegRemuxing::EncodeImageThread, this, output, oformat, params));
 }
 
@@ -206,6 +201,13 @@ void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AV
     std::lock_guard<std::mutex> lock(frame_mtx_);
     if(!frame_buffer_)
     {
+        return;
+    }
+
+    if(!src && !size)
+    {
+        frame_comed_ = true;
+        cv_img_.notify_one();
         return;
     }
 
@@ -219,6 +221,11 @@ void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AV
 void FFmpegRemuxing::Stop()
 {
     running_.store(false);
+    if(encode_image_thread_.joinable())
+    {
+        PutImageFrame(nullptr, 0, AV_PIX_FMT_NONE);
+        encode_image_thread_.join();
+    }
 }
 
 bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)

@@ -8,6 +8,11 @@ FFmpegEncodeFrame::FFmpegEncodeFrame()
 
 FFmpegEncodeFrame::~FFmpegEncodeFrame()
 {
+    if(codec_)
+    {
+        avcodec_close(ctx_);
+    }
+
     if(ctx_)
     {
         avcodec_free_context(&ctx_);
