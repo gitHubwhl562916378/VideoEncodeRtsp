@@ -37,10 +37,8 @@ int main(int argc, char **argv)
     params.width = 1920;
     params.height = 1080;
     std::cout << params.width << " " << params.height << std::endl;
-    if(!remuxing.RemuxingImage("rtsp://192.168.2.66/test", "rtsp", params))
-    {
-        return -1;
-    }
+    remuxing.RemuxingImage("rtsp://192.168.2.66/test", "rtsp", params);
+
     while(true)
     {
         cv::Mat frame;

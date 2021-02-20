@@ -17,7 +17,8 @@ FFmpegRemuxing::FFmpegRemuxing()
 {
     av_log_set_level(AV_LOG_INFO);
 
-    running_.store(true);
+    running_.store(false);
+    frame_comed_ = false;
 }
 
 bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::string &output, const std::string &oformat)
@@ -184,48 +185,82 @@ bool FFmpegRemuxing::RemuxingVideoFile(const std::string &input, const std::stri
     running_.store(false);
 }
 
-bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
+void FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
 {
+    if(running_.load())
+    {
+        std::cout << "Encode is running, stop first" << std::endl;
+        return;
+    }
+
+    if(encode_image_thread_.joinable())
+    {
+        encode_image_thread_.join();
+    }
+
+    encode_image_thread_ = std::thread(std::bind(&FFmpegRemuxing::EncodeImageThread, this, output, oformat, params));
+}
+
+void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
+{
+    std::lock_guard<std::mutex> lock(frame_mtx_);
+    if(!frame_buffer_)
+    {
+        return;
+    }
+
+    frame_size_ = size;
+    pix_fmt_ = fmt;
+    ::memcpy(frame_buffer_, src, frame_size_);
+    frame_comed_ = true;
+    cv_img_.notify_one();
+}
+
+void FFmpegRemuxing::Stop()
+{
+    running_.store(false);
+}
+
+bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
+{
+    AVFormatContext *output_format = nullptr;
+    AVStream *video_st = nullptr;
+    std::shared_ptr<FFmpegEncodeFrame> encoder;
     char errbuf[512]{0};
-    int ret = avformat_alloc_output_context2(&output_format_, nullptr, oformat.data(), output.data());
+    int ret = avformat_alloc_output_context2(&output_format, nullptr, oformat.data(), output.data());
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
         std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-        avformat_free_context(output_format_);
+        avformat_free_context(output_format);
         return false;
     }
 
-    video_st_ = avformat_new_stream(output_format_, 0);
-    if(!video_st_)
+    video_st = avformat_new_stream(output_format, 0);
+    if(!video_st)
     {
-        avformat_free_context(output_format_);
+        avformat_free_context(output_format);
         return false;
     }
-    video_st_->time_base = params.time_base;
+    video_st->time_base = params.time_base;
     
-    encoder_.reset(new FFmpegEncodeFrame);
+    encoder.reset(new FFmpegEncodeFrame);
 
-#if 1
-    auto pcodec_ctx = encoder_->Initsize(params);
+    auto pcodec_ctx = encoder->Initsize(params);
     if(!pcodec_ctx)
     {
         return false;
     }
-    avcodec_parameters_from_context(video_st_->codecpar, pcodec_ctx);
-#else
-    bool is_ok = encoder_->Initsize(video_st_->codec, params);
-    avcodec_parameters_from_context(video_st_->codecpar, video_st_->codec);
-#endif
+    avcodec_parameters_from_context(video_st->codecpar, pcodec_ctx);
 
-    if(!(output_format_->oformat->flags & AVFMT_NOFILE))
+    if(!(output_format->oformat->flags & AVFMT_NOFILE))
     {
-        ret = avio_open(&output_format_->pb, output.data(), AVIO_FLAG_WRITE);
+        ret = avio_open(&output_format->pb, output.data(), AVIO_FLAG_WRITE);
         if (ret != 0)
         {
             av_make_error_string(errbuf, sizeof(errbuf), ret);
             std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-            avformat_free_context(output_format_);
+            avformat_free_context(output_format);
             return false;
         }
     }
@@ -238,38 +273,71 @@ bool FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
     av_dict_set(&opt, "preset", "fast", 0); //ultrafast fast
     av_dict_set(&opt, "tune", "zerolatency", 0);
     av_dict_set(&opt, "rtsp_transport", "tcp", 0);
-    ret = avformat_write_header(output_format_, &opt);
+    ret = avformat_write_header(output_format, &opt);
     if(ret != 0)
     {
         av_make_error_string(errbuf, sizeof(errbuf), ret);
         std::cout << __FUNCTION__ << " " << errbuf << std::endl;
-        avformat_free_context(output_format_);
+        avformat_free_context(output_format);
         return false;
     }
 
-    return true;
-}
-
-void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
-{
-    char errbuf[512]{0};
-    if(!image_start_pt_)
     {
-        image_start_pt_ = av_gettime();
+        std::lock_guard<std::mutex> lock(frame_mtx_);
+        frame_buffer_ = new char[av_image_get_buffer_size(params.pix_fmt, params.width, params.height, 1)];
     }
-    int64_t now_time = av_gettime() - image_start_pt_;
-    int64_t pts = av_rescale_q(now_time, {1, AV_TIME_BASE}, {1, 1000});
-    encoder_->Encode(src, size, fmt, pts, [&](AVPacket *packet){
-        int ret = av_interleaved_write_frame(output_format_, packet);
-        if (ret < 0) {
-            av_make_error_string(errbuf, sizeof(errbuf), ret);
-            std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
-            return;
+    int64_t image_start_pt = 0;
+    running_.store(true);
+    while(running_.load())
+    {
+        if(!frame_size_)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
         }
-    });
-}
 
-void FFmpegRemuxing::Stop()
-{
+        if(!image_start_pt)
+        {
+            image_start_pt = av_gettime();
+        }
+
+        int64_t now_time = av_gettime() - image_start_pt;
+        int64_t pts = av_rescale_q(now_time, {1, AV_TIME_BASE}, {1, 90000});
+        if(pts > now_time)
+        {
+            av_usleep(pts - now_time);
+        }
+
+        std::unique_lock<std::mutex> lock(frame_mtx_);
+        cv_img_.wait(lock, [this] { return frame_comed_; });
+        encoder->Encode(frame_buffer_, frame_size_, pix_fmt_, pts, [&](AVPacket *packet){
+            int ret = av_interleaved_write_frame(output_format, packet);
+            if (ret < 0) {
+                av_make_error_string(errbuf, sizeof(errbuf), ret);
+                std::cout << "Error muxing packet: code " << ret << ", msg " << errbuf << std::endl;
+                return;
+            }
+        });
+        frame_comed_ = false;
+    }
+
+    av_write_trailer(output_format);
+
+    if(!(output_format->oformat->flags & AVFMT_NOFILE))
+    {
+        avio_close(output_format->pb);
+    }
+
+    avformat_free_context(output_format);
+
+    {
+        std::lock_guard<std::mutex> lock(frame_mtx_);
+        delete frame_buffer_;
+        frame_buffer_ = nullptr;
+        frame_size_ = 0;
+        pix_fmt_ = AV_PIX_FMT_NONE;
+    }
     running_.store(false);
+
+    return true;
 }

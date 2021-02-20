@@ -47,8 +47,6 @@ public:
 
     AVCodecContext* Initsize(const VideoParams &params);
 
-    bool Initsize(AVCodecContext* pcodec_ctx, const VideoParams &params);
-
     bool Encode(const char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
