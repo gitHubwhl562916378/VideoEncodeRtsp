@@ -13,17 +13,19 @@
 
 int main(int argc, char **argv)
 {
-    if(argc < 3)
+    if(argc < 4)
     {
-        std::cout << "Usage: " << argv[0] << " <input file or stream> <out file or stream>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <input file or stream> <out file or stream> <output format>. sample: " << std::endl
+        << "./video_encode_rtsp 103.mp4 rtsp://192.168.2.66/test rtsp" << std::endl;;
         return -1;
     }
 
     char *video_file = argv[1];
     char *out_file = argv[2];
+    char *oformat = argv[3];
     FFmpegRemuxing remuxing;
 #if 0
-    remuxing.RemuxingVideoFile(video_file, out_file, "rtsp");
+    remuxing.RemuxingVideoFile(video_file, out_file, oformat);
 #else
     cv::VideoCapture capture(video_file);
     if(!capture.isOpened())
@@ -41,7 +43,7 @@ int main(int argc, char **argv)
         params.height = 1080;
     }
     std::cout << params.width << " " << params.height << std::endl;
-    remuxing.RemuxingImage(out_file, "rtsp", params);
+    remuxing.RemuxingImage(out_file, oformat, params);
 
     while(true)
     {
