@@ -291,7 +291,7 @@ bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::str
 
     {
         std::lock_guard<std::mutex> lock(frame_mtx_);
-        frame_buffer_ = new char[av_image_get_buffer_size(params.pix_fmt, params.width, params.height, 1)];
+        frame_buffer_ = new char[av_image_get_buffer_size(params.src_pix_fmt, params.width, params.height, 1)];
     }
     int64_t image_start_pt = 0;
     running_.store(true);

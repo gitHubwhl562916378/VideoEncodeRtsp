@@ -3,7 +3,7 @@
 
 FFmpegEncodeFrame::FFmpegEncodeFrame()
 {
-    mem_cp_func_map_.insert(std::make_pair(AV_PIX_FMT_YUV420P, std::bind(&FFmpegEncodeFrame::CopyYuvFrameData, this, std::placeholders::_1, std::placeholders::_2)));
+    
 }
 
 FFmpegEncodeFrame::~FFmpegEncodeFrame()
@@ -26,6 +26,11 @@ FFmpegEncodeFrame::~FFmpegEncodeFrame()
     if(pkt_)
     {
         av_packet_free(&pkt_);
+    }
+
+    if(sws_ctx_)
+    {
+        sws_freeContext(sws_ctx_);
     }
 }
 
@@ -53,6 +58,7 @@ AVCodecContext* FFmpegEncodeFrame::Initsize(const VideoParams &params)
     ctx_->framerate = params.framerate;
     ctx_->gop_size = params.gop_size;
     ctx_->pix_fmt = AVPixelFormat(params.pix_fmt);
+    src_pix_fmt_ = params.src_pix_fmt;
     ctx_->keyint_min = 30;
     ctx_->qmax = 35;
     ctx_->qmin = 30;
@@ -100,18 +106,17 @@ AVCodecContext* FFmpegEncodeFrame::Initsize(const VideoParams &params)
         return nullptr;
     }
 
-    auto iter = mem_cp_func_map_.find(AVPixelFormat(ctx_->pix_fmt));
-    if(iter == mem_cp_func_map_.end())
-    {
-        std::cout << "Could suport pixformat" << std::endl;
-        return nullptr;
-    }
-    mem_cp_func_ = iter->second;
-
     pkt_ = av_packet_alloc();
     if(!pkt_)
     {
         std::cout << "Could not allocate the packet" << std::endl;
+        return nullptr;
+    }
+
+    sws_ctx_ = sws_getContext(frame_->width, frame_->height, params.src_pix_fmt, frame_->width, frame_->height, params.pix_fmt, SWS_BICUBIC,nullptr,nullptr,nullptr);
+    if(!sws_ctx_)
+    {
+        std::cout << "FFmpegEncodeFrame::Initsize sws_getContext nullptr" << std::endl;
         return nullptr;
     }
 
@@ -127,8 +132,10 @@ bool FFmpegEncodeFrame::Encode(const char *data, int size, int type, int64_t pts
         std::cout << "FFmpegEncodeFrame::Encode av_frame_make_writable error, code " << ret << std::endl;
         return false;
     }
-
-    mem_cp_func_(data, frame_);
+    int *srcStride = nullptr;
+    uint8_t** srcBuf = nullptr;
+    GetFrameSlice(frame_->width, frame_->height, (uint8_t*)data, src_pix_fmt_, srcBuf, srcStride);
+    sws_scale(sws_ctx_, srcBuf, srcStride, 0, frame_->height, frame_->data, frame_->linesize);
     frame_->pts = pts;
 
     ret = avcodec_send_frame(ctx_, frame_);
@@ -159,22 +166,10 @@ bool FFmpegEncodeFrame::Encode(const char *data, int size, int type, int64_t pts
     }
 }
 
-void FFmpegEncodeFrame::CopyYuvFrameData(const char *src, AVFrame *frame)
+void FFmpegEncodeFrame::GetFrameSlice(const int width, const int height, uint8_t *data, const AVPixelFormat fmt, uint8_t** &slice_ptr, int * & stride)
 {
-    for(int y = 0; y < frame->height; y++)
+    if(fmt == AV_PIX_FMT_BGR24)
     {
-        ::memcpy(frame->data[0] + y * frame->width, src + y * frame->width, frame->width);
-    }
-
-    int pos = frame->width * frame->height;
-    for(int y = 0; y < (frame->height >> 1); y++)
-    {
-        ::memcpy(frame->data[1] + y * (frame->width >> 1), src + pos + y * (frame->width >> 1), frame->width >> 1);
-    }
-
-    pos += ((frame->width * frame->height) >> 2);
-    for(int y = 0; y < (frame->height >> 1); y++)
-    {
-        ::memcpy(frame->data[2] + y * (frame->width >> 1), src + pos + y * (frame->width >> 1), (frame->width >> 1));
+        
     }
 }

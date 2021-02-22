@@ -12,6 +12,7 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
+#include "libswscale/swscale.h"
 }
 #include <functional>
 #include <map>
@@ -40,6 +41,7 @@ public:
         int gop_size = 10;
         int max_b_frames = 1;
         AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P;
+        AVPixelFormat src_pix_fmt = AV_PIX_FMT_BGR24;
     };
     explicit FFmpegEncodeFrame();
 
@@ -50,13 +52,12 @@ public:
     bool Encode(const char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
-    using Mem_Option_Func = std::function<void(const char*, AVFrame*)>;
-    void CopyYuvFrameData(const char *src, AVFrame *frame);
+    void GetFrameSlice(const int width, const int height, uint8_t *data, const AVPixelFormat fmt, uint8_t** &slice_ptr, int * & stride);
 
+    AVPixelFormat src_pix_fmt_;
     const AVCodec *codec_ = nullptr;
     AVCodecContext *ctx_ = nullptr;
     AVFrame *frame_ = nullptr;
     AVPacket *pkt_ = nullptr;
-    std::map<AVPixelFormat, Mem_Option_Func> mem_cp_func_map_;
-    Mem_Option_Func mem_cp_func_;
+    SwsContext *sws_ctx_ = nullptr;
 };

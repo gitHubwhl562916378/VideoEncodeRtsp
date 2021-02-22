@@ -54,8 +54,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        cv::cvtColor(frame, frame, cv::COLOR_BGR2YUV_I420);
-        remuxing.PutImageFrame((char *)frame.data, frame.total() * frame.elemSize(), AV_PIX_FMT_YUV420P);
+        // cv::cvtColor(frame, frame, cv::COLOR_BGR2YUV_I420); //AV_PIX_FMT_YUV420P
+        remuxing.PutImageFrame((char *)frame.data, frame.total() * frame.elemSize(), AV_PIX_FMT_BGR24);
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000/25));
     }
 
