@@ -123,7 +123,7 @@ AVCodecContext* FFmpegEncodeFrame::Initsize(const VideoParams &params)
     return ctx_;
 }
 
-bool FFmpegEncodeFrame::Encode(const char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back)
+bool FFmpegEncodeFrame::Encode(const char *data, int size, int64_t pts, std::function<void(AVPacket*)> call_back)
 {
     int ret;
     ret = av_frame_make_writable(frame_);
@@ -134,8 +134,15 @@ bool FFmpegEncodeFrame::Encode(const char *data, int size, int type, int64_t pts
     }
     int *srcStride = nullptr;
     uint8_t** srcBuf = nullptr;
-    GetFrameSlice(frame_->width, frame_->height, (uint8_t*)data, src_pix_fmt_, srcBuf, srcStride);
+    GetFrameSlice(frame_->width, frame_->height, (uint8_t *)data, src_pix_fmt_, srcBuf, srcStride);
+    if(!srcStride || !srcBuf)
+    {
+        std::cout << "FFmpegEncodeFrame::Encode GetFrameSlice failed" << std::endl;
+        return false;
+    }
     sws_scale(sws_ctx_, srcBuf, srcStride, 0, frame_->height, frame_->data, frame_->linesize);
+    delete srcStride;
+    delete srcBuf;
     frame_->pts = pts;
 
     ret = avcodec_send_frame(ctx_, frame_);
@@ -168,8 +175,29 @@ bool FFmpegEncodeFrame::Encode(const char *data, int size, int type, int64_t pts
 
 void FFmpegEncodeFrame::GetFrameSlice(const int width, const int height, uint8_t *data, const AVPixelFormat fmt, uint8_t** &slice_ptr, int * & stride)
 {
-    if(fmt == AV_PIX_FMT_BGR24)
+    if(fmt == AV_PIX_FMT_BGR24 || fmt == AV_PIX_FMT_RGB24)
     {
-        
+        slice_ptr = new uint8_t*[1];
+        stride = new int[1];
+        slice_ptr[0] = data;
+        stride[0] = width * 3;
+    }else if(fmt == AV_PIX_FMT_YUV420P)
+    {
+        slice_ptr = new uint8_t*[3];
+        stride = new int[3];
+        slice_ptr[0] = data;
+        stride[0] = width;
+        slice_ptr[1] = data + width * height;
+        stride[1] = width >> 1;
+        slice_ptr[2] = data + width * height * 5 / 4;
+        stride[2] = width >> 1;
+    }else if(fmt == AV_PIX_FMT_NV12)
+    {
+        slice_ptr = new uint8_t*[2];
+        stride = new int[2];
+        slice_ptr[0] = data;
+        stride[0] = width;
+        slice_ptr[1] = data + width * height;
+        stride[1] = width;
     }
 }

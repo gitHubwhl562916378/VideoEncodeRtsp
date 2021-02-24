@@ -32,7 +32,7 @@ public:
 
     void RemuxingImage(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params = FFmpegEncodeFrame::VideoParams());
 
-    void PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt);
+    void PutImageFrame(const char *src, const int64_t size);
 
     void Stop();
 
@@ -47,5 +47,4 @@ private:
     bool frame_comed_ = false;
     char *frame_buffer_ = nullptr;
     int64_t frame_size_ = 0;
-    AVPixelFormat pix_fmt_;
 };

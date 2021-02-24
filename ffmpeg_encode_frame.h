@@ -49,7 +49,7 @@ public:
 
     AVCodecContext* Initsize(const VideoParams &params);
 
-    bool Encode(const char *data, int size, int type, int64_t pts, std::function<void(AVPacket*)> call_back);
+    bool Encode(const char *data, int size, int64_t pts, std::function<void(AVPacket*)> call_back);
 
 private:
     void GetFrameSlice(const int width, const int height, uint8_t *data, const AVPixelFormat fmt, uint8_t** &slice_ptr, int * & stride);

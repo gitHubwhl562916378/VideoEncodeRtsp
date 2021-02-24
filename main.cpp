@@ -37,6 +37,7 @@ int main(int argc, char **argv)
     FFmpegEncodeFrame::VideoParams params;
     params.width = capture.get(CV_CAP_PROP_FRAME_WIDTH);
     params.height = capture.get(CV_CAP_PROP_FRAME_HEIGHT);
+    params.src_pix_fmt = AV_PIX_FMT_BGR24; //AV_PIX_FMT_YUV420P AV_PIX_FMT_BGR24
     if(!params.width || !params.height)
     {
         params.width = 1920;
@@ -54,8 +55,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        // cv::cvtColor(frame, frame, cv::COLOR_BGR2YUV_I420); //AV_PIX_FMT_YUV420P
-        remuxing.PutImageFrame((char *)frame.data, frame.total() * frame.elemSize(), AV_PIX_FMT_BGR24);
+        // cv::cvtColor(frame, frame, cv::COLOR_BGR2YUV_I420);
+        remuxing.PutImageFrame((char *)frame.data, frame.total() * frame.elemSize());
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000/25));
     }
 

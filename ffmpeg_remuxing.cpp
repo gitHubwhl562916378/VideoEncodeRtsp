@@ -196,7 +196,7 @@ void FFmpegRemuxing::RemuxingImage(const std::string &output, const std::string 
     encode_image_thread_ = std::thread(std::bind(&FFmpegRemuxing::EncodeImageThread, this, output, oformat, params));
 }
 
-void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AVPixelFormat &fmt)
+void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size)
 {
     std::lock_guard<std::mutex> lock(frame_mtx_);
     if(!frame_buffer_)
@@ -212,7 +212,6 @@ void FFmpegRemuxing::PutImageFrame(const char *src, const int64_t size, const AV
     }
 
     frame_size_ = size;
-    pix_fmt_ = fmt;
     ::memcpy(frame_buffer_, src, frame_size_);
     frame_comed_ = true;
     cv_img_.notify_one();
@@ -223,7 +222,7 @@ void FFmpegRemuxing::Stop()
     running_.store(false);
     if(encode_image_thread_.joinable())
     {
-        PutImageFrame(nullptr, 0, AV_PIX_FMT_NONE);
+        PutImageFrame(nullptr, 0);
         encode_image_thread_.join();
     }
 }
@@ -317,7 +316,7 @@ bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::str
 
         std::unique_lock<std::mutex> lock(frame_mtx_);
         cv_img_.wait(lock, [this] { return frame_comed_; });
-        encoder->Encode(frame_buffer_, frame_size_, pix_fmt_, pts, [&](AVPacket *packet){
+        encoder->Encode(frame_buffer_, frame_size_, pts, [&](AVPacket *packet){
             int ret = av_interleaved_write_frame(output_format, packet);
             if (ret < 0) {
                 av_make_error_string(errbuf, sizeof(errbuf), ret);
@@ -342,7 +341,6 @@ bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::str
         delete frame_buffer_;
         frame_buffer_ = nullptr;
         frame_size_ = 0;
-        pix_fmt_ = AV_PIX_FMT_NONE;
     }
     running_.store(false);
 
