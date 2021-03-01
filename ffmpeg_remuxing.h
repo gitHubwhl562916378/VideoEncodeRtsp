@@ -36,6 +36,8 @@ public:
 
     void Stop();
 
+    bool isRunning();
+
 private:
     bool EncodeImageThread(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params);
 

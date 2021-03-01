@@ -227,6 +227,11 @@ void FFmpegRemuxing::Stop()
     }
 }
 
+bool FFmpegRemuxing::isRunning()
+{
+    return running_.load();
+}
+
 bool FFmpegRemuxing::EncodeImageThread(const std::string &output, const std::string &oformat, const FFmpegEncodeFrame::VideoParams &params)
 {
     AVFormatContext *output_format = nullptr;
