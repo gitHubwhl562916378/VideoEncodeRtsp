@@ -1,14 +1,18 @@
 /*
  * @Author: your name
  * @Date: 2021-02-09 19:05:24
- * @LastEditTime: 2021-02-19 18:19:41
+ * @LastEditTime: 2021-03-06 14:52:51
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\main.cpp
  */
 #include <chrono>
 #include <thread>
+#ifdef WIN32
+#include <filesystem>
+#else
 #include <experimental/filesystem>
+#endif
 #include "opencv2/opencv.hpp"
 #include "ffmpeg_remuxing.h"
 #define USE3
@@ -87,17 +91,30 @@ int main(int argc, char **argv)
 
     remuxing.Stop();
 #elif defined USE3
+#ifdef WIN32
+    std::filesystem::path cur_path(std::filesystem::current_path().string() + "/images");
+    int count = std::count_if(std::filesystem::recursive_directory_iterator(cur_path), std::filesystem::recursive_directory_iterator(),
+        [](const std::filesystem::directory_entry &p)
+        {
+            std::cout << p << " " << p.file_size() << std::endl;
+            return p.is_regular_file();
+        }
+    );
+    std::string cur_path_str = cur_path.string();
+#else
     std::string cur_path_str = std::experimental::filesystem::current_path();
     std::experimental::filesystem::path cur_path(cur_path_str + "/images");
+    cur_path_str = cur_path;
     int count = std::count_if(std::experimental::filesystem::recursive_directory_iterator(cur_path), std::experimental::filesystem::recursive_directory_iterator(), 
         [](const std::experimental::filesystem::directory_entry & p)
         {
             return p.status().type() == std::experimental::filesystem::file_type::regular; //regular, symlink, directory, character,fifo,socker
         }
     );
+#endif
     for(size_t i = 0; i < count; i++)
     {
-        cv::Mat frame = cv::imread(std::string(cur_path) + "/" + std::to_string(i) + ".jpg");
+        cv::Mat frame = cv::imread(cur_path_str + "/" + std::to_string(i) + ".jpg");
         if(!remuxing.isRunning())
         {
             FFmpegEncodeFrame::VideoParams params;
