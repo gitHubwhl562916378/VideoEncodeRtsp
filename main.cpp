@@ -6,13 +6,38 @@
  * @Description: In User Settings Edit
  * @FilePath: \qt_project\VideoEncodeRtsp\main.cpp
  */
- #include <chrono>
+#include <chrono>
 #include <thread>
+#include <experimental/filesystem>
 #include "opencv2/opencv.hpp"
 #include "ffmpeg_remuxing.h"
+#define USE3
 
 int main(int argc, char **argv)
 {
+#if 0
+    cv::VideoCapture capture_save("4.mp4");
+    if(!capture_save.isOpened())
+    {
+        std::cout << "open failed" << std::endl;
+        return -1;
+    }
+
+    int frame_index = 0;
+    while(true)
+    {
+        cv::Mat frame;
+        capture_save >> frame;
+        if(frame.empty())
+        {
+            break;
+        }
+
+        cv::imwrite("images/" + std::to_string(frame_index++) + ".jpg", frame);
+    }
+
+    return 0;
+#else
     if(argc < 4)
     {
         std::cout << "Usage: " << argv[0] << " <input file or stream> <out file or stream> <output format>. sample: " << std::endl
@@ -24,9 +49,9 @@ int main(int argc, char **argv)
     char *out_file = argv[2];
     char *oformat = argv[3];
     FFmpegRemuxing remuxing;
-#if 0
+#ifdef USE1
     remuxing.RemuxingVideoFile(video_file, out_file, oformat);
-#else
+#elif defined USE2
     cv::VideoCapture capture(video_file);
     if(!capture.isOpened())
     {
@@ -61,6 +86,33 @@ int main(int argc, char **argv)
     }
 
     remuxing.Stop();
+#elif defined USE3
+    std::string cur_path_str = std::experimental::filesystem::current_path();
+    std::experimental::filesystem::path cur_path(cur_path_str + "/images");
+    int count = std::count_if(std::experimental::filesystem::recursive_directory_iterator(cur_path), std::experimental::filesystem::recursive_directory_iterator(), 
+        [](const std::experimental::filesystem::directory_entry & p)
+        {
+            return p.status().type() == std::experimental::filesystem::file_type::regular; //regular, symlink, directory, character,fifo,socker
+        }
+    );
+    for(size_t i = 0; i < count; i++)
+    {
+        cv::Mat frame = cv::imread(std::string(cur_path) + "/" + std::to_string(i) + ".jpg");
+        if(!remuxing.isRunning())
+        {
+            FFmpegEncodeFrame::VideoParams params;
+            params.width = frame.cols;
+            params.height = frame.rows;
+            params.src_pix_fmt = AV_PIX_FMT_BGR24; //AV_PIX_FMT_YUV420P AV_PIX_FMT_BGR24
+            remuxing.RemuxingImage(out_file, oformat, params);
+        }
+        // cv::cvtColor(frame, frame, cv::COLOR_BGR2YUV_I420);
+        remuxing.PutImageFrame((char *)frame.data, frame.total() * frame.elemSize());
+		// std::this_thread::sleep_for(std::chrono::milliseconds(1000/25));
+    }
+
+    remuxing.Stop();
+#endif
 #endif
     return 0;
 }

@@ -44,5 +44,5 @@ target_link_libraries(${PROJECT_NAME} ${FFMPEG_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 
 if (UNIX)
-target_link_libraries(${PROJECT_NAME} pthread)
+target_link_libraries(${PROJECT_NAME} pthread stdc++fs)
 endif ()
